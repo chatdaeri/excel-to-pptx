@@ -82,16 +82,14 @@ def infer_type(cells):
 def scan_sheet(ws):
     rows = [list(r) for r in ws.iter_rows(values_only=True)]
     if not rows:
-        return {'main': '', 'sub': '(없음)', 'tables': [], 'warning': '빈 시트'}
+        return {'main': '', 'sub': '(없음)', 'blocks': [], 'needs_auto_message': False}
 
-    # 1행 = main
+    # 1행 = main (위치 고정 — 빈 행이어도 skip 안 함)
     main = first_nonempty(rows[0]) if rows else ''
-    # 2행 = sub (값 있으면)
-    sub = ''
-    idx = 1
-    if idx < len(rows) and not is_empty_row(rows[idx]):
-        sub = first_nonempty(rows[idx])
+    # 2행 = sub (위치 고정)
+    sub = first_nonempty(rows[1]) if len(rows) >= 2 else ''
     sub_display = sub if sub else '(없음)'
+    needs_auto_message = (not main) and (not sub)
 
     # [표] / [차트] 행 찾기 + 헤더/샘플 추출
     blocks = []
@@ -146,14 +144,19 @@ def scan_sheet(ws):
             'samples': samples
         })
 
-    return {'main': main, 'sub': sub_display, 'blocks': blocks}
+    return {'main': main, 'sub': sub_display, 'blocks': blocks,
+            'needs_auto_message': needs_auto_message}
 
 
 def format_sheet(name, data):
     lines = []
     lines.append(f"=== {name} ===")
-    lines.append(f"main: {data['main']}")
+    main_display = data['main'] if data['main'] else '(없음)'
+    lines.append(f"main: {main_display}")
     lines.append(f"sub:  {data['sub']}")
+    if data.get('needs_auto_message'):
+        lines.append("  ⚠ 메인·서브 모두 비어있음 — Claude 가 블록 내용을 보고 "
+                     "deck.cjs 에 mainMessage/subhead 를 직접 기입해야 함")
     blocks = data['blocks']
     n = len(blocks)
     n_tb = sum(1 for b in blocks if b['kind'] == 'table')
@@ -206,6 +209,8 @@ def main():
         total_blocks += nb
         if nb >= 5:
             warnings.append(f"  ⚠ 시트 '{name}' 에 블록 {nb}개 → 슬라이드 분할 필요")
+        if data.get('needs_auto_message'):
+            warnings.append(f"  ⚠ 시트 '{name}' 메인·서브 비어있음 → deck.cjs 에 직접 기입 필요")
 
     # 포맷
     full = '\n\n'.join(format_sheet(name, data) for name, data in scans)
