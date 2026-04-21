@@ -1,6 +1,6 @@
 # 커스텀 작업 매뉴얼 (AI 전용)
 
-**🤖 이 문서는 AI(Claude) 가 사용자로부터 "회사 톤으로 lite 스킬 스타일을 바꿔줘" 요청을 받았을 때 따라야 할 작업 절차다. 사용자(사람) 가 읽으라고 만든 문서가 아니다 — 사용자 안내는 README.md 의 "회사 스타일에 맞게 바꾸기" 섹션에 있다.**
+**🤖 이 문서는 AI(Claude) 가 사용자로부터 "회사 톤으로 excel-to-pptx 스킬 스타일을 바꿔줘" 요청을 받았을 때 따라야 할 작업 절차다. 사용자(사람) 가 읽으라고 만든 문서가 아니다 — 사용자 안내는 README.md 의 "회사 스타일에 맞게 바꾸기" 섹션에 있다.**
 
 ---
 
@@ -8,12 +8,12 @@
 
 사용자가 다음 같은 요청을 할 때:
 
-- "우리 회사 PPT 톤에 맞게 lite 스킬 스타일을 바꿔줘"
+- "우리 회사 PPT 톤에 맞게 excel-to-pptx 스킬 스타일을 바꿔줘"
 - "이 PPTX 보고 컬러·폰트 우리 회사 톤으로 적용"
 - 회사 가이드 이미지/PPTX 를 던지면서 "이 스타일로 톤 갈아줘"
 - "표 헤더 색을 회색 말고 네이비로 바꾸고 싶어"
 
-**중요**: lite 스킬은 차트·지도·컨셉 박스·3블록 자동 슬라이드·inline 차트 series 재구성 같은 기능이 없다. 만약 사용자가 "차트 색도 바꿔줘" 같은 요청을 하면 lite 가 차트를 지원하지 않는다고 안내한다.
+**중요**: excel-to-pptx 스킬은 차트·지도·컨셉 박스·3블록 자동 슬라이드·inline 차트 series 재구성 같은 기능이 없다. 만약 사용자가 "차트 색도 바꿔줘" 같은 요청을 하면 excel-to-pptx 가 차트를 지원하지 않는다고 안내한다.
 
 ---
 
@@ -62,7 +62,7 @@ mkdir /tmp/refppt && cd /tmp/refppt && unzip <ref.pptx>
 | 표 셀 배경 | `<a:tcPr><a:fill><a:solidFill>` |
 | 보더 굵기·색 | `<a:lnL/lnR/lnT/lnB w="25400">` (EMU 단위, 12700=1pt) |
 
-위 정보를 **현재 lite 의 기본값과 대조**해서 변경 항목 리스트를 만든다. lite 의 현재 기본값은 `builders/_helpers.cjs` 상단의 `C` 객체와 `FONT_*`, `BORDER_*` 상수에 있다.
+위 정보를 **현재 excel-to-pptx 의 기본값과 대조**해서 변경 항목 리스트를 만든다. excel-to-pptx 의 현재 기본값은 `builders/_helpers.cjs` 상단의 `C` 객체와 `FONT_*`, `BORDER_*` 상수에 있다.
 
 ### 3단계 — 변경 리스트 사용자에게 보여주고 컨펌
 
@@ -98,7 +98,7 @@ mkdir /tmp/refppt && cd /tmp/refppt && unzip <ref.pptx>
 
 ### 4단계 — 코드 수정
 
-#### 4-A. 변경 지점 맵 (lite 전용)
+#### 4-A. 변경 지점 맵 (excel-to-pptx 전용)
 
 | 변경 항목 | 위치 |
 |---|---|
@@ -121,7 +121,7 @@ mkdir /tmp/refppt && cd /tmp/refppt && unzip <ref.pptx>
 2. **새 컬러가 필요하면 `C` 객체에 추가만**. 예: `C.brandOrange = 'FF6F00'`. 기존 키는 건드리지 않는다.
 3. **새 Weight 가 필요하면 상수 추가** + `module.exports` 에 등록. 예: `FONT_EXTRABOLD = 'Noto Sans KR ExtraBold'`.
 4. **사이즈를 키우면 LAYOUT 의 `h` 도 같이 조정**. 예를 들어 `mainMessage` 사이즈를 18pt → 24pt 로 키우면 `LAYOUT.MAIN_MSG.h` 를 0.50 → 0.70 정도로. 안 키우면 텍스트가 잘림.
-5. **lite 의 `decideBorders` 함수는 빨간 외곽선(emph) 로직이 들어 있다**. 강조 행 처리 방식을 외곽선 → 배경 tint 로 바꾸려면 `decideBorders` 의 `BORDER_EMPH` 사용 부분을 다 제거하고 `buildTableRows` 의 `fill` 분기에 `isEmph` 케이스 추가.
+5. **excel-to-pptx 의 `decideBorders` 함수는 빨간 외곽선(emph) 로직이 들어 있다**. 강조 행 처리 방식을 외곽선 → 배경 tint 로 바꾸려면 `decideBorders` 의 `BORDER_EMPH` 사용 부분을 다 제거하고 `buildTableRows` 의 `fill` 분기에 `isEmph` 케이스 추가.
 
 #### 4-C. 자주 쓰는 변형 예시
 
@@ -212,7 +212,7 @@ PPT 파일을 사용자가 직접 열어서:
 1. **`C` 객체 키 이름 바꾸지 말 것** — 값만 교체. 이름 바꾸면 다른 빌더 참조 깨짐.
 2. **폰트 바꿀 때 사용자 시스템에 폰트 설치 여부 확인** — PowerPoint 가 폰트를 못 찾으면 fallback 폰트로 표시돼서 의도가 안 살아남.
 3. **사용자 컨펌 없이 코드 수정 시작 금지** — 변경 리스트 보여주고 OK 받은 다음 시작.
-4. **차트 관련 요청은 거절** — lite 는 차트 자체가 없다. "차트 컬러도 바꿔줘" 같은 요청은 지원 불가 안내.
+4. **차트 관련 요청은 거절** — excel-to-pptx 는 차트 자체가 없다. "차트 컬러도 바꿔줘" 같은 요청은 지원 불가 안내.
 5. **Stage 1 좌표 검증 무시 금지** — LAYOUT 좌표를 임의로 슬라이드 경계 밖으로 이동시키면 빌드가 멈춘다. 마진(좌우 0.42 inch) 안에서 작업.
 6. **테스트 빌드 없이 끝내기 금지** — 수정 후 한 번이라도 빌드 돌려서 시각 확인 권장.
 
@@ -243,6 +243,6 @@ PPT 파일을 사용자가 직접 열어서:
 
 수정 끝낸 뒤 사용자에게 다음을 명시:
 
-- **이 변경은 lite 스킬 자체에 적용된다**. 그 결과 lite 로 만드는 모든 PPT 가 같은 톤으로 빌드된다.
-- 만약 회사 A 톤과 회사 B 톤을 둘 다 써야 한다면 lite 폴더를 통째로 복사해서 `excel-to-pptx-companyA` / `excel-to-pptx-companyB` 두 개로 분리하는 방법이 있다 (사용자가 원하면 안내).
+- **이 변경은 excel-to-pptx 스킬 자체에 적용된다**. 그 결과 excel-to-pptx 로 만드는 모든 PPT 가 같은 톤으로 빌드된다.
+- 만약 회사 A 톤과 회사 B 톤을 둘 다 써야 한다면 excel-to-pptx 폴더를 통째로 복사해서 `excel-to-pptx-companyA` / `excel-to-pptx-companyB` 두 개로 분리하는 방법이 있다 (사용자가 원하면 안내).
 - 변경된 파일을 git 으로 백업해두면 나중에 원래 톤으로 돌리기 쉽다.
