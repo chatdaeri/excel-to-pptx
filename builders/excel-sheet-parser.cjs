@@ -27,25 +27,15 @@
 function parseSheet(sheetName, rows2D, merges = []) {
   const rows = (rows2D || []).map(r => Array.isArray(r) ? r : []);
 
-  let idx = 0;
-  idx = skipEmpty(rows, idx);
+  // 1행 = 메인 메시지 (위치 고정). 빈 셀이면 빈 문자열 유지.
+  // 2행 = 서브 메시지 (위치 고정). 빈 셀이면 빈 문자열 유지.
+  // 선행 빈 행을 skipEmpty 로 먹으면 1·2행이 3행·4행으로 밀리므로 절대 금지.
+  let mainMessage = rows.length >= 1 ? getFirstNonEmpty(rows[0]) : '';
+  let subMessage  = rows.length >= 2 ? getFirstNonEmpty(rows[1]) : '';
 
-  // 1행: 키 메시지 (메인)
-  let mainMessage = '';
-  if (idx < rows.length) {
-    mainMessage = getFirstNonEmpty(rows[idx]);
-    idx++;
-  }
-
-  // 2행: 서브 메시지 (부제). 비어있어도 idx 는 전진
-  let subMessage = '';
-  if (idx < rows.length && !isEmptyRow(rows[idx])) {
-    subMessage = getFirstNonEmpty(rows[idx]);
-    idx++;
-  }
-
-  // 이후: 블록 수집
+  // 이후: 블록 수집 (3행부터)
   const blocks = [];
+  let idx = 2;
   while (idx < rows.length) {
     idx = skipEmpty(rows, idx);
     if (idx >= rows.length) break;
@@ -65,7 +55,9 @@ function parseSheet(sheetName, rows2D, merges = []) {
     sectionLabel: deriveSectionLabel(sheetName),
     mainMessage,
     subMessage,
-    blocks
+    blocks,
+    needsAutoMessage: !mainMessage && !subMessage,
+    firstBlockTitle: (blocks[0] && blocks[0].title) || ''
   };
 }
 

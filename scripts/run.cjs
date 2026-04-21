@@ -153,12 +153,16 @@ const dividerTitles = slides
   .map(s => String(s.title || s.chapter || '').replace(/\s*\n\s*/g, ' ').trim())
   .filter(Boolean);
 
+// sectionLabel fallback 용: 슬라이드 순회 중 마지막 divider 의 chapter 추적
+let currentDividerChapter = '';
+
 // ── 단계 2. 슬라이드 빌드 ──
 console.log('\n[2/4] PPTX 빌드');
 
 slides.forEach((s, i) => {
   const n = i + 1;
   try {
+    if (s.type === 'divider') currentDividerChapter = String(s.chapter || '').trim();
     dispatch(s, n);
     console.log(`   · 슬라이드 ${n}/${slides.length}  ${s.type}  OK`);
   } catch (e) {
@@ -166,6 +170,40 @@ slides.forEach((s, i) => {
     throw e;
   }
 });
+
+/**
+ * sectionLabel fallback ladder:
+ *   1) 시트명 파싱 결과가 `대 / 소` 형태 → 그대로
+ *   2) 대목차만 있음 (`/` 없음)          → `대 / firstBlockTitle`
+ *   3) 완전히 비어있음                   → `divider chapter / (firstBlockTitle || sheetName)`
+ * deck.cjs 에 명시된 sectionLabel 이 있으면 이 함수는 호출되지 않음 (항상 그게 우선).
+ */
+function fallbackSectionLabel(specSectionLabel, firstBlockTitle, sheetName) {
+  const label = String(specSectionLabel || '').trim();
+  const hasSlash = label.includes('/');
+  if (label && hasSlash) return label;
+  if (label && !hasSlash) {
+    return firstBlockTitle ? `${label} / ${firstBlockTitle}` : label;
+  }
+  // 완전히 비어있음
+  const big = currentDividerChapter || '';
+  const sub = firstBlockTitle || sheetName || '';
+  if (big && sub) return `${big} / ${sub}`;
+  return big || sub || '';
+}
+
+function warnIfAutoMessageNeeded(spec, slideIdx, ctx) {
+  if (!spec.needsAutoMessage) return;
+  const blockDesc = spec.blocks
+    .map((b, i) => `[${i + 1}] ${b.kind === 'chart' ? '차트' : '표'} "${b.title || '(제목 없음)'}" (${b.rows.length}행 × ${b.headers.length}열)`)
+    .join(', ');
+  console.warn(
+    `   ⚠ 슬라이드 ${slideIdx} (${ctx}, sheet="${spec.sheetName}"): ` +
+    `엑셀 1·2행이 모두 비어있음. mainMessage/subhead 가 빈 상태로 렌더됩니다.\n` +
+    `     → Claude 는 이 시트의 블록을 읽고 deck.cjs 에 mainMessage/subhead 를 직접 기입해야 합니다.\n` +
+    `     블록: ${blockDesc || '(없음)'}`
+  );
+}
 
 function dispatch(s, slideIdx) {
   switch (s.type) {
@@ -201,7 +239,7 @@ function dispatch(s, slideIdx) {
     case 'bigtable': return buildBigtable(s, slideIdx);
     case 'data2col': return buildData2col(s, slideIdx);
 
-    // lite 미지원 타입 — 친절한 안내
+    // excel-to-pptx 미지원 타입 — 친절한 안내
     case 'bigchart':
     case 'map':
     case 'concept':
@@ -256,10 +294,12 @@ function buildBigtable(s, slideIdx) {
     };
     tableHeader  = tableHeader  || b.title;
     source       = source       || b.source;
-    sectionLabel = sectionLabel || spec.sectionLabel;
+    sectionLabel = sectionLabel || fallbackSectionLabel(spec.sectionLabel, spec.firstBlockTitle, s.sheet);
     mainMessage  = mainMessage  || spec.mainMessage;
     subhead      = subhead      || spec.subMessage;
     blockMerges  = b.merges || [];
+
+    if (!s.mainMessage && !s.subhead) warnIfAutoMessageNeeded(spec, slideIdx, 'bigtable');
   }
 
   buildT7b(pres, {
@@ -297,8 +337,8 @@ function buildData2col(s, slideIdx) {
 
     if (spec.blocks.length !== 2) {
       const hint = spec.blocks.length === 1 ? "1블록 → bigtable 사용"
-                 : spec.blocks.length === 3 ? "3블록은 lite 미지원 — 시트를 둘로 분리하세요"
-                 :                            "블록 수 확인 후 분할 (lite 는 1·2블록만 지원)";
+                 : spec.blocks.length === 3 ? "3블록은 excel-to-pptx 미지원 — 시트를 둘로 분리하세요"
+                 :                            "블록 수 확인 후 분할 (excel-to-pptx 는 1·2블록만 지원)";
       throw new Error(
         `data2col 은 2블록 전용. sheet "${s.sheet}" 블록 ${spec.blocks.length}개 → ${hint}`
       );
@@ -308,10 +348,12 @@ function buildData2col(s, slideIdx) {
     rightSlot    = rightSlot || blockToTableSlot(b1);
     leftHeader   = leftHeader   || b0.title;
     rightHeader  = rightHeader  || b1.title;
-    sectionLabel = sectionLabel || spec.sectionLabel;
+    sectionLabel = sectionLabel || fallbackSectionLabel(spec.sectionLabel, spec.firstBlockTitle, s.sheet);
     subhead      = subhead      || spec.subMessage;
     mainMessage  = mainMessage  || spec.mainMessage;
     source       = source       || b0.source || b1.source;
+
+    if (!s.mainMessage && !s.subhead) warnIfAutoMessageNeeded(spec, slideIdx, 'data2col');
   }
 
   buildT1Table(pres, {
